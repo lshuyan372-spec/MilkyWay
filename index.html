@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Nova - 融合版星河许愿引擎</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #070914 0%, #020205 65%, #000 100%);
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: white;
+      user-select: none;
+    }
+
+    #video-bg {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 0;
+      transform: scaleX(-1);
+      opacity: 0.12;
+      filter: grayscale(85%) blur(1px);
+      pointer-events: none;
+    }
+
+    #canvas-container { position: absolute; inset: 0; z-index: 1; }
+
+    #top-prompt {
+      position: absolute;
+      top: 46px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.36s ease, transform 0.36s ease;
+      width: min(92vw, 900px);
+    }
+    #top-prompt.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0px);
+    }
+    #top-prompt .main {
+      font-size: 32px;
+      letter-spacing: 8px;
+      color: #edf2ff;
+      text-shadow: 0 0 24px rgba(180, 200, 255, 0.72);
+      font-weight: 300;
+    }
+
+    .ui-panel {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      min-width: 240px;
+      max-width: min(90vw, 560px);
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: rgba(10, 10, 16, 0.34);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.22);
+      text-align: center;
+      pointer-events: none;
+    }
+    #hint-text {
+      font-size: 11px;
+      color: rgba(255,255,255,0.42);
+      line-height: 1.4;
+      min-height: 14px;
+      letter-spacing: 1px;
+    }
+
+    #ripple-container {
+      position: absolute;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(235, 240, 255, 0.68);
+      transform: translate(-50%, -50%) scale(0);
+      animation: ripple-expand 2.2s ease-out forwards;
+      box-shadow: 0 0 24px rgba(220,230,255,0.18);
+    }
+    @keyframes ripple-expand {
+      0% { transform: translate(-50%, -50%) scale(0); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(7.5); opacity: 0; }
+    }
+
+    #flash {
+      position: absolute;
+      inset: 0;
+      z-index: 25;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(235,240,255,0.85) 0%, rgba(235,240,255,0.0) 62%);
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+    #flash.active { opacity: 1; }
+
+    #wish-ring {
+      position: absolute;
+      inset: 0;
+      z-index: 9;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.0) 38%);
+    }
+    #wish-ring.active { opacity: 1; }
+
+    #wish-progress {
+      position: fixed;
+      z-index: 19;
+      width: 90px;
+      height: 90px;
+      pointer-events: none;
+      display: none;
+      transform: translate(-50%, -50%);
+      filter: drop-shadow(0 0 8px rgba(190,210,255,0.6));
+    }
+
+    #hand-cursor {
+      position: absolute;
+      z-index: 18;
+      pointer-events: none;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(200,220,255,0.44);
+      box-shadow: 0 0 18px rgba(160,200,255,0.24), inset 0 0 10px rgba(160,200,255,0.1);
+      transform: translate(-50%, -50%);
+      display: none;
+      transition: width 0.22s ease, height 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, opacity 0.22s ease;
+    }
+    #hand-cursor.catch-window {
+      animation: pulse-ring 1.3s ease-in-out infinite;
+      border-color: rgba(220, 230, 255, 0.8);
+      box-shadow: 0 0 28px rgba(180,210,255,0.5), inset 0 0 14px rgba(180,210,255,0.12);
+    }
+    #hand-cursor.clenched {
+      width: 26px;
+      height: 26px;
+      border-color: rgba(255,245,220,0.95);
+      box-shadow: 0 0 32px rgba(255,240,180,0.82);
+      background: rgba(255,255,255,0.16);
+      animation: none;
+    }
+    #hand-cursor.blooming {
+      width: 92px;
+      height: 92px;
+      border-color: rgba(235,240,255,0.9);
+      box-shadow: 0 0 36px rgba(220,230,255,0.78);
+      animation: none;
+    }
+    @keyframes pulse-ring {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 0 22px rgba(180,210,255,0.36), inset 0 0 14px rgba(180,210,255,0.12);
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.08);
+        box-shadow: 0 0 40px rgba(180,210,255,0.78), inset 0 0 18px rgba(180,210,255,0.14);
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body>
+  <video id="video-bg" autoplay playsinline muted></video>
+  <div id="canvas-container"></div>
+  <div id="ripple-container"></div>
+  <div id="flash"></div>
+  <div id="wish-ring"></div>
+  <div id="hand-cursor"></div>
+
+  <div id="wish-progress">
+    <svg viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(200,215,255,0.12)" stroke-width="2"/>
+      <circle id="wish-arc" cx="50" cy="50" r="45"
+        fill="none" stroke="rgba(210,225,255,0.9)" stroke-width="3"
+        stroke-linecap="round"
+        stroke-dasharray="283" stroke-dashoffset="283"
+        transform="rotate(-90 50 50)"/>
+    </svg>
+  </div>
+
+  <div id="top-prompt">
+    <div class="main" id="top-prompt-main"></div>
+  </div>
+
+  <div class="ui-panel">
+    <div id="hint-text">点击屏幕可跳过</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+    const P_COUNT = 25000;
+    const STATES = {
+      GALAXY_IDLE: 'GALAXY_IDLE',
+      WISH_WINDOW: 'WISH_WINDOW',
+      WISH_RESPONSE: 'WISH_RESPONSE',
+      CATCH_WAIT: 'CATCH_WAIT',
+      CATCH_WINDOW: 'CATCH_WINDOW',
+      METEOR_CAPTURED: 'METEOR_CAPTURED',
+      ENERGY_CORE: 'ENERGY_CORE',
+      BOX_FORM: 'BOX_FORM',
+      BOX_HOLD: 'BOX_HOLD',
+      BLOOM_PROMPT: 'BLOOM_PROMPT',
+      BOX_OPEN: 'BOX_OPEN',
+      TEXT_REVEAL: 'TEXT_REVEAL',
+      ENDING: 'ENDING'
+    };
+
+    const INPUT_MODES = {
+      INITIALIZING: 'INITIALIZING',
+      CAMERA: 'CAMERA',
+      POINTER: 'POINTER'
+    };
+
+    const CONFIG = {
+      smoothFactor: 0.16,
+      openThreshold: 0.68,
+      closeThreshold: 0.42,
+      wishDuration: 2.2,
+      responseDuration: 2.0,
+      catchWaitDuration: 0.9,
+      catchWindowDuration: 7.8,
+      captureFlightDuration: 1.25,
+      energyCoreDuration: 1.0,
+      boxFormDuration: 1.35,
+      boxHoldDuration: 0.75,
+      bloomDelay: 0.2,
+      defaultBloom: 2.15,
+      meteorBloom: 3.6,
+      defaultFog: 0.015,
+      meteorFog: 0.022,
+      cameraBootTimeout: 4500,
+      textRevealDuration: 4.0,
+      endingDuration: 5.0
+    };
+
+    const COL = {
+      silver: new THREE.Color(0xcfd6e6),
+      white: new THREE.Color(0xffffff),
+      deepSilver: new THREE.Color(0x98a2b8),
+      softBlue: new THREE.Color(0xbfd4ff),
+      softPink: new THREE.Color(0xf4c6ff),
+      brightSilver: new THREE.Color(0xf3f6ff),
+      warmWhite: new THREE.Color(0xfff7ef)
+    };
+
+    let currentState = STATES.GALAXY_IDLE;
+    let inputMode = INPUT_MODES.INITIALIZING;
+    let stateTime = 0;
+    const clock = new THREE.Clock();
+
+    let scene, camera, renderer, composer, bloomPass, particles;
+    let posArray, velArray, colorArray;
+    let galaxyPoints = [], giftPoints = [], textPoints = [];
+    let giftRibbonMask = [];
+
+    let handOpenRaw = 1;
+    let handOpenSmooth = 1;
+    let closeHoldTimer = 0;
+    let openHoldTimer = 0;
+    let rightHand = { active: false, pos: new THREE.Vector3(), pinch: false, open: 1 };
+    let leftHand = { active: false, pos: new THREE.Vector3(), pinch: false };
+    let rightHandScreenX = window.innerWidth * 0.5;
+    let rightHandScreenY = window.innerHeight * 0.5;
+    let wishHoldTimer = 0;
+    let lastWishDistance = null;
+
+    const pointerState = {
+      active: false,
+      isDown: false,
+      clicked: false,
+      dblTapped: false,
+      lastTap: 0
+    };
+
+    let corePos = new THREE.Vector3(0, 0, 0);
+    let boxRotY = 0;
+    const tempVec3 = new THREE.Vector3();
+    let cameraBootResolved = false;
+
+    const meteors = [];
+    let interactiveMeteor = null;
+    let ambientMeteorCooldown = 1.2;
+    let firstWishMeteorShown = false;
+    let bloomTriggered = false;
+
+    initThree();
+    generateMorphTargets();
+    initHands();
+    initPointerFallback();
+
+    setTimeout(() => {
+      if (!cameraBootResolved && !pointerState.active) {
+        inputMode = INPUT_MODES.POINTER;
+        setBottomHint('点击屏幕可跳过');
+      }
+    }, CONFIG.cameraBootTimeout);
+
+    animate();
+
+    function initThree() {
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x020205, CONFIG.defaultFog);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 25);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+      composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), CONFIG.defaultBloom, 0.6, 0.15);
+      composer.addPass(bloomPass);
+
+      const geo = new THREE.BufferGeometry();
+      posArray = new Float32Array(P_COUNT * 3);
+      velArray = new Float32Array(P_COUNT * 3);
+      colorArray = new Float32Array(P_COUNT * 3);
+      geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+
+      const mat = new THREE.PointsMaterial({
+        size: 0.05,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.88,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      particles = new THREE.Points(geo, mat);
+      scene.add(particles);
+      window.addEventListener('resize', onResize);
+    }
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function setMeteorFocus(active) {
+      bloomPass.strength = active ? CONFIG.meteorBloom : CONFIG.defaultBloom;
+      scene.fog.density = active ? CONFIG.meteorFog : CONFIG.defaultFog;
+    }
+
+    function generateMorphTargets() {
+      galaxyPoints = [];
+      giftPoints = [];
+      textPoints = [];
+      giftRibbonMask = [];
+
+      for (let i = 0; i < P_COUNT; i++) {
+        const r = Math.pow(Math.random(), 3) * 55;
+        const theta = Math.random() * Math.PI * 2;
+        const spiral = r * 0.25;
+        const phi = (Math.random() - 0.5) * 2.5;
+        galaxyPoints.push({
+          x: r * Math.cos(theta + spiral),
+          y: phi * (1 - r / 55) * 6,
+          z: r * Math.sin(theta + spiral)
+        });
+      }
+
+      for (let i = 0; i < P_COUNT; i++) {
+        let x = (Math.random() - 0.5) * 6;
+        let y = (Math.random() - 0.5) * 6;
+        let z = (Math.random() - 0.5) * 6;
+        let isRibbon = false;
+
+        if (Math.random() > 0.6) x = Math.sign(x || 1) * 3;
+        else if (Math.random() > 0.5) y = Math.sign(y || 1) * 3;
+        else z = Math.sign(z || 1) * 3;
+
+        if (Math.abs(x) < 0.35 || Math.abs(z) < 0.35) isRibbon = true;
+
+        giftPoints.push({ x, y: y - 2, z });
+        giftRibbonMask.push(isRibbon);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 300;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 220px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('生日快乐', 600, 150);
+      const data = ctx.getImageData(0, 0, 1200, 300).data;
+      const tempText = [];
+      for (let y = 0; y < 300; y += 3) {
+        for (let x = 0; x < 1200; x += 3) {
+          if (data[(y * 1200 + x) * 4] > 128) {
+            tempText.push({ x: (x - 600) * 0.03, y: (150 - y) * 0.03 + 3, z: (Math.random() - 0.5) });
+          }
+        }
+      }
+      for (let i = 0; i < P_COUNT; i++) textPoints.push(tempText[i % tempText.length]);
+
+      for (let i = 0; i < P_COUNT; i++) {
+        const gp = galaxyPoints[i];
+        posArray[i * 3] = gp.x + (Math.random() - 0.5);
+        posArray[i * 3 + 1] = gp.y + (Math.random() - 0.5);
+        posArray[i * 3 + 2] = gp.z + (Math.random() - 0.5);
+        velArray[i * 3] = 0;
+        velArray[i * 3 + 1] = 0;
+        velArray[i * 3 + 2] = 0;
+        colorArray[i * 3] = COL.silver.r;
+        colorArray[i * 3 + 1] = COL.silver.g;
+        colorArray[i * 3 + 2] = COL.silver.b;
+      }
+    }
+
+    function initHands() {
+      const videoElement = document.getElementById('video-bg');
+      try {
+        const hands = new Hands({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.5,
+          selfieMode: true
+        });
+
+        hands.onResults(results => {
+          cameraBootResolved = true;
+          inputMode = INPUT_MODES.CAMERA;
+          leftHand.active = false;
+          rightHand.active = false;
+
+          if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+            document.getElementById('hand-cursor').style.display = 'none';
+            handOpenRaw = 1;
+            return;
+          }
+
+          results.multiHandLandmarks.forEach((lm, idx) => {
+            const label = results.multiHandedness?.[idx]?.label || 'Right';
+            const pos = new THREE.Vector3(
+              (lm[9].x - 0.5) * 35,
+              -(lm[9].y - 0.5) * 25,
+              lm[9].z * -15
+            );
+            const thumb = lm[4];
+            const index = lm[8];
+            const pinchDist = Math.hypot(index.x - thumb.x, index.y - thumb.y);
+            const pinch = pinchDist < 0.06;
+
+            const wrist = lm[0];
+            const fingertips = [lm[4], lm[8], lm[12], lm[16], lm[20]];
+            const avgDist = fingertips.reduce((sum, tip) => sum + Math.hypot(tip.x - wrist.x, tip.y - wrist.y), 0) / 5;
+            const open = Math.min(Math.max((avgDist - 0.1) / 0.2, 0), 1);
+
+            if (label === 'Left') {
+              leftHand.active = true;
+              leftHand.pos.copy(pos);
+              leftHand.pinch = pinch;
+            } else {
+              rightHand.active = true;
+              rightHand.pos.lerp(pos, 0.28);
+              rightHand.pinch = pinch;
+              rightHand.open = open;
+              handOpenRaw = open;
+              rightHandScreenX += (lm[9].x * window.innerWidth - rightHandScreenX) * 0.18;
+              rightHandScreenY += (lm[9].y * window.innerHeight - rightHandScreenY) * 0.18;
+              const hc = document.getElementById('hand-cursor');
+              hc.style.display = 'block';
+              hc.style.left = `${rightHandScreenX}px`;
+              hc.style.top = `${rightHandScreenY}px`;
+            }
+          });
+        });
+
+        const cameraInput = new Camera(videoElement, {
+          onFrame: async () => { await hands.send({ image: videoElement }); },
+          width: 1280,
+          height: 720
+        });
+        cameraInput.start();
+      } catch (err) {
+        console.warn('MediaPipe 初始化失败，回退到鼠标模式', err);
+        cameraBootResolved = true;
+        inputMode = INPUT_MODES.POINTER;
+      }
+    }
+
+    function initPointerFallback() {
+      window.addEventListener('pointermove', e => {
+        if (inputMode === INPUT_MODES.CAMERA) return;
+        inputMode = INPUT_MODES.POINTER;
+        pointerState.active = true;
+        rightHand.active = true;
+        rightHand.pos.set((e.clientX / window.innerWidth - 0.5) * 35, -((e.clientY / window.innerHeight) - 0.5) * 25, 0);
+        handOpenRaw = pointerState.isDown ? 0 : 1;
+        rightHandScreenX += (e.clientX - rightHandScreenX) * 0.25;
+        rightHandScreenY += (e.clientY - rightHandScreenY) * 0.25;
+        const hc = document.getElementById('hand-cursor');
+        hc.style.display = 'block';
+        hc.style.left = `${rightHandScreenX}px`;
+        hc.style.top = `${rightHandScreenY}px`;
+      });
+
+      window.addEventListener('pointerdown', () => {
+        pointerState.clicked = true;
+        const now = performance.now();
+        if (now - pointerState.lastTap < 320) pointerState.dblTapped = true;
+        pointerState.lastTap = now;
+
+        if (inputMode === INPUT_MODES.CAMERA) return;
+        inputMode = INPUT_MODES.POINTER;
+        pointerState.isDown = true;
+        handOpenRaw = 0;
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (inputMode === INPUT_MODES.CAMERA) return;
+        pointerState.isDown = false;
+        handOpenRaw = 1;
+      });
+    }
+
+    function consumePointerClick() {
+      if (pointerState.clicked) {
+        pointerState.clicked = false;
+        return true;
+      }
+      return false;
+    }
+
+    function updateGestureState(dt) {
+      handOpenSmooth += (handOpenRaw - handOpenSmooth) * CONFIG.smoothFactor;
+
+      if (handOpenSmooth < CONFIG.closeThreshold) {
+        closeHoldTimer += dt;
+        openHoldTimer = 0;
+      } else if (handOpenSmooth > CONFIG.openThreshold) {
+        openHoldTimer += dt;
+        closeHoldTimer = 0;
+      } else {
+        closeHoldTimer = 0;
+        openHoldTimer = 0;
+      }
+
+      if (rightHand.active) corePos.lerp(rightHand.pos, 0.12);
+      updateWishProgressUI();
+      updateCursorState();
+    }
+
+    function updateCursorState() {
+      const cursor = document.getElementById('hand-cursor');
+      if (!rightHand.active && inputMode === INPUT_MODES.CAMERA) {
+        cursor.style.display = 'none';
+        return;
+      }
+      cursor.classList.toggle('clenched', handOpenSmooth < 0.35 && currentState !== STATES.BOX_OPEN && currentState !== STATES.TEXT_REVEAL);
+    }
+
+    function detectWishGesture(dt) {
+      if (inputMode === INPUT_MODES.POINTER) {
+        if (pointerState.isDown || consumePointerClick()) {
+          wishHoldTimer += dt * 2.4;
+        } else {
+          wishHoldTimer = Math.max(0, wishHoldTimer - dt * 1.6);
+        }
+        return wishHoldTimer >= 0.45;
+      }
+
+      let triggered = false;
+
+      if (leftHand.active && rightHand.active) {
+        const d = leftHand.pos.distanceTo(rightHand.pos);
+
+        // 关键：根据双手离镜头远近自适配，不再使用固定绝对距离。
+        // 手越靠近镜头，pos.z 的绝对值通常越大，这里会自动放大允许的双手间距。
+        const depthScale = Math.max(8, (Math.abs(leftHand.pos.z) + Math.abs(rightHand.pos.z)) * 0.5 + 8);
+        const normalizedDist = d / depthScale;
+        const closing = lastWishDistance === null ? true : d < lastWishDistance + 0.18;
+        lastWishDistance = d;
+
+        const isPrayerLike =
+          normalizedDist < 1.28 ||
+          (normalizedDist < 1.55 && closing);
+
+        if (isPrayerLike) {
+          wishHoldTimer += dt * (normalizedDist < 1.0 ? 3.2 : 2.4);
+          triggered = wishHoldTimer >= 0.22;
+        } else {
+          wishHoldTimer = Math.max(0, wishHoldTimer - dt * 2.2);
+        }
+      } else {
+        lastWishDistance = null;
+
+        // 单手兜底，防止偶尔只识别出一只手时完全失效
+        const isSingleHandWish = rightHand.active && handOpenSmooth < 0.72;
+        if (isSingleHandWish) {
+          wishHoldTimer += dt * 1.25;
+          triggered = wishHoldTimer >= 0.7;
+        } else {
+          wishHoldTimer = Math.max(0, wishHoldTimer - dt * 1.8);
+        }
+      }
+
+      return triggered;
+    }
+
+    function updateWishProgressUI() {
+      const ring = document.getElementById('wish-progress');
+      const arc = document.getElementById('wish-arc');
+      if (currentState === STATES.WISH_WINDOW && rightHand.active && wishHoldTimer > 0.05) {
+        const progress = Math.min(wishHoldTimer / CONFIG.wishDuration, 1);
+        const circumference = 283;
+        ring.style.display = 'block';
+        ring.style.left = `${rightHandScreenX}px`;
+        ring.style.top = `${rightHandScreenY}px`;
+        arc.style.strokeDashoffset = `${circumference * (1 - progress)}`;
+      } else {
+        ring.style.display = 'none';
+      }
+    }
+
+    function spawnAmbientMeteor(bright = false) {
+      const side = Math.random() > 0.5 ? 1 : -1;
+      const meteor = {
+        interactive: false,
+        pos: new THREE.Vector3(side * (20 + Math.random() * 8), 8 + Math.random() * 6, -5 + Math.random() * 10),
+        vel: new THREE.Vector3(-side * (0.16 + Math.random() * 0.08), -0.05 - Math.random() * 0.03, 0),
+        trail: [],
+        life: 0,
+        maxLife: 2.8 + Math.random() * 1.8,
+        captured: false,
+        captureLerp: 0,
+        mesh: new THREE.Mesh(
+          new THREE.SphereGeometry(bright ? 0.28 : 0.18, 16, 16),
+          new THREE.MeshBasicMaterial({ color: bright ? 0xffffff : 0xcfd8ff, transparent: true, opacity: 1.0 })
+        ),
+        trailMesh: new THREE.Line(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({ color: bright ? 0xe8f0ff : 0x92a8d6, transparent: true, opacity: bright ? 1.0 : 0.7, blending: THREE.AdditiveBlending })
+        )
+      };
+      meteor.mesh.position.copy(meteor.pos);
+      scene.add(meteor.mesh);
+      scene.add(meteor.trailMesh);
+      meteors.push(meteor);
+    }
+
+    function spawnInteractiveMeteor() {
+      setMeteorFocus(true);
+      const startX = Math.max(window.innerWidth / window.innerHeight, 1.2) * 13.5;
+      const meteor = {
+        interactive: true,
+        pos: new THREE.Vector3(startX, 8, -4),
+        vel: new THREE.Vector3(-0.045, -0.012, 0),
+        trail: [],
+        life: 0,
+        maxLife: CONFIG.catchWindowDuration + 8,
+        captured: false,
+        captureLerp: 0,
+        mesh: new THREE.Mesh(
+          new THREE.SphereGeometry(0.34, 18, 18),
+          new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 })
+        ),
+        trailMesh: new THREE.Line(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({ color: 0xf3f7ff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending })
+        )
+      };
+      meteor.mesh.position.copy(meteor.pos);
+      scene.add(meteor.mesh);
+      scene.add(meteor.trailMesh);
+      meteors.push(meteor);
+      interactiveMeteor = meteor;
+    }
+
+    function updateMeteors(dt, time) {
+      if (!interactiveMeteor && (currentState === STATES.GALAXY_IDLE || currentState === STATES.WISH_WINDOW)) {
+        ambientMeteorCooldown -= dt;
+        if (ambientMeteorCooldown <= 0) {
+          spawnAmbientMeteor();
+          ambientMeteorCooldown = 1.6 + Math.random() * 2.3;
+          if (!firstWishMeteorShown) {
+            firstWishMeteorShown = true;
+            enterState(STATES.WISH_WINDOW);
+          }
+        }
+      }
+
+      const wrapX = Math.max(window.innerWidth / window.innerHeight, 1.2) * 14;
+
+      for (let i = meteors.length - 1; i >= 0; i--) {
+        const m = meteors[i];
+        m.life += dt;
+
+        if (m.interactive && !m.captured) {
+          if (currentState === STATES.CATCH_WAIT) {
+            m.mesh.material.opacity = Math.min(1, stateTime * 0.9 + 0.2);
+            m.trailMesh.material.opacity = Math.min(1, stateTime * 0.8 + 0.1);
+          }
+          if (currentState === STATES.CATCH_WINDOW) {
+            if (m.pos.x < -wrapX) m.pos.x = wrapX;
+            if (m.pos.y < -15) m.pos.y = 12;
+            m.vel.y += Math.sin(time * 2.4) * 0.0015;
+          }
+        }
+
+        if (m.interactive && m.captured) {
+          m.captureLerp += dt / CONFIG.captureFlightDuration;
+          const progress = Math.min(m.captureLerp, 1);
+          tempVec3.copy(corePos).sub(m.pos).normalize();
+          m.vel.multiplyScalar(0.9);
+          m.vel.addScaledVector(tempVec3, 0.24 + progress * 0.22);
+          if (progress > 0.9 || currentState === STATES.ENERGY_CORE || currentState === STATES.BOX_FORM || currentState === STATES.BOX_HOLD || currentState === STATES.BLOOM_PROMPT || currentState === STATES.BOX_OPEN || currentState === STATES.TEXT_REVEAL) {
+            m.mesh.visible = false;
+            m.trailMesh.visible = false;
+          }
+        }
+
+        m.pos.add(m.vel);
+        m.mesh.position.copy(m.pos);
+        m.trail.push(m.pos.clone());
+        const maxTrail = m.interactive ? 84 : 48;
+        if (m.trail.length > maxTrail) m.trail.shift();
+        if (m.trail.length > 2) m.trailMesh.geometry.setFromPoints(m.trail);
+
+        const outOfView = Math.abs(m.pos.x) > 36 || m.pos.y < -20;
+        const finishedInteractive = m.interactive && m.captureLerp > 1.15;
+        if (m.life > m.maxLife || (!m.interactive && outOfView) || finishedInteractive) {
+          scene.remove(m.mesh);
+          scene.remove(m.trailMesh);
+          m.mesh.geometry.dispose();
+          m.trailMesh.geometry.dispose();
+          meteors.splice(i, 1);
+          if (interactiveMeteor === m) interactiveMeteor = null;
+        }
+      }
+    }
+
+    function updateStateMachine(dt) {
+      switch (currentState) {
+        case STATES.GALAXY_IDLE:
+          break;
+        case STATES.WISH_WINDOW:
+          if (detectWishGesture(dt)) enterState(STATES.WISH_RESPONSE);
+          break;
+        case STATES.WISH_RESPONSE:
+          if (stateTime > CONFIG.responseDuration) enterState(STATES.CATCH_WAIT);
+          break;
+        case STATES.CATCH_WAIT:
+          if (!interactiveMeteor) spawnInteractiveMeteor();
+          if (stateTime > CONFIG.catchWaitDuration) enterState(STATES.CATCH_WINDOW);
+          break;
+        case STATES.CATCH_WINDOW:
+          if (closeHoldTimer > 0.08 || (inputMode === INPUT_MODES.POINTER && consumePointerClick()) || stateTime > CONFIG.catchWindowDuration) {
+            enterState(STATES.METEOR_CAPTURED);
+          }
+          break;
+        case STATES.METEOR_CAPTURED:
+          if (interactiveMeteor && !interactiveMeteor.captured) interactiveMeteor.captured = true;
+          if (stateTime > CONFIG.captureFlightDuration) enterState(STATES.ENERGY_CORE);
+          break;
+        case STATES.ENERGY_CORE:
+          if (stateTime > CONFIG.energyCoreDuration) enterState(STATES.BOX_FORM);
+          break;
+        case STATES.BOX_FORM:
+          if (stateTime > CONFIG.boxFormDuration) enterState(STATES.BOX_HOLD);
+          break;
+        case STATES.BOX_HOLD:
+          if (stateTime > CONFIG.boxHoldDuration || consumePointerClick()) enterState(STATES.BLOOM_PROMPT);
+          break;
+        case STATES.BLOOM_PROMPT:
+          if (!bloomTriggered && (openHoldTimer > 0.12 || consumePointerClick())) {
+            bloomTriggered = true;
+            enterState(STATES.BOX_OPEN);
+          }
+          break;
+        case STATES.BOX_OPEN:
+          if (stateTime > 2.5) enterState(STATES.TEXT_REVEAL);
+          break;
+        case STATES.TEXT_REVEAL:
+          if (stateTime > CONFIG.textRevealDuration) enterState(STATES.ENDING);
+          break;
+        case STATES.ENDING:
+          if (stateTime > CONFIG.endingDuration || consumePointerClick()) {
+            resetExperience();
+            enterState(STATES.GALAXY_IDLE);
+          }
+          break;
+      }
+    }
+
+    function enterState(nextState) {
+      currentState = nextState;
+      stateTime = 0;
+      const cursor = document.getElementById('hand-cursor');
+      cursor.classList.remove('catch-window', 'clenched', 'blooming');
+      setStateUI(nextState);
+
+      if (nextState === STATES.WISH_RESPONSE) triggerWishResponse();
+      if (nextState === STATES.CATCH_WINDOW) cursor.classList.add('catch-window');
+      if (nextState === STATES.METEOR_CAPTURED) {
+        cursor.classList.add('clenched');
+        triggerFlash();
+      }
+      if (nextState === STATES.BOX_FORM) {
+        triggerFlash();
+        triggerRipple(rightHandScreenX, rightHandScreenY, 110, 0);
+      }
+      if (nextState === STATES.BLOOM_PROMPT) cursor.classList.add('clenched');
+      if (nextState === STATES.BOX_OPEN) {
+        cursor.classList.add('blooming');
+        triggerFlash();
+      }
+    }
+
+    function triggerWishResponse() {
+      const ring = document.getElementById('wish-ring');
+      ring.classList.add('active');
+      triggerFlash();
+      triggerRipple(window.innerWidth / 2, window.innerHeight / 2, 120, 0);
+      triggerRipple(window.innerWidth / 2, window.innerHeight / 2, 150, 180);
+      triggerRipple(window.innerWidth / 2, window.innerHeight / 2, 180, 340);
+      setTimeout(() => ring.classList.remove('active'), 700);
+      bloomPass.strength = 2.8;
+      spawnAmbientMeteor(true);
+      wishHoldTimer = 0;
+    }
+
+    function triggerRipple(x, y, size = 120, delay = 0) {
+      setTimeout(() => {
+        const el = document.createElement('div');
+        el.className = 'ripple';
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.style.width = `${size}px`;
+        el.style.height = `${size}px`;
+        document.getElementById('ripple-container').appendChild(el);
+        setTimeout(() => el.remove(), 2600);
+      }, delay);
+    }
+
+    function triggerFlash() {
+      const flash = document.getElementById('flash');
+      flash.classList.add('active');
+      setTimeout(() => flash.classList.remove('active'), 220);
+    }
+
+    function animatePrompt(main, visible) {
+      const prompt = document.getElementById('top-prompt');
+      prompt.classList.remove('visible');
+      setTimeout(() => {
+        document.getElementById('top-prompt-main').innerText = main;
+        prompt.classList.toggle('visible', visible && !!main);
+      }, 180);
+    }
+
+    function setBottomHint(hint) {
+      document.getElementById('hint-text').innerText = hint;
+    }
+
+    function setStateUI(nextState) {
+      switch (nextState) {
+        case STATES.GALAXY_IDLE:
+          setMeteorFocus(false);
+          animatePrompt('', false);
+          setBottomHint('点击屏幕可跳过');
+          break;
+        case STATES.WISH_WINDOW:
+          animatePrompt('闭上眼，许个愿', true);
+          setBottomHint('双手靠近即可触发许愿，离镜头远近都会自适应');
+          break;
+        case STATES.WISH_RESPONSE:
+          setMeteorFocus(false);
+          animatePrompt('', false);
+          setBottomHint('点击屏幕可跳过');
+          break;
+        case STATES.CATCH_WAIT:
+          animatePrompt('', false);
+          setBottomHint('点击屏幕可跳过');
+          break;
+        case STATES.CATCH_WINDOW:
+          animatePrompt('握住这束光', true);
+          setBottomHint('伸出手，抓紧流星');
+          break;
+        case STATES.METEOR_CAPTURED:
+        case STATES.ENERGY_CORE:
+        case STATES.BOX_FORM:
+        case STATES.BOX_HOLD:
+          animatePrompt('', false);
+          setBottomHint('点击屏幕可跳过');
+          break;
+        case STATES.BLOOM_PROMPT:
+          animatePrompt('慢慢张开手', true);
+          setBottomHint('让礼物在掌心绽放');
+          break;
+        case STATES.BOX_OPEN:
+          animatePrompt('', false);
+          setBottomHint('');
+          break;
+        case STATES.TEXT_REVEAL:
+          animatePrompt('', false);
+          setBottomHint('');
+          break;
+        case STATES.ENDING:
+          animatePrompt('', false);
+          setBottomHint('点击屏幕可重新开始');
+          break;
+      }
+    }
+
+    function updateParticles(dt, time) {
+      let angleSpeed = 0.15;
+      if (currentState === STATES.WISH_RESPONSE) angleSpeed = 0.22 - Math.min(stateTime * 0.05, 0.07);
+
+      if (currentState === STATES.BOX_FORM) boxRotY += dt * 0.9;
+      else if (currentState === STATES.BOX_HOLD || currentState === STATES.BLOOM_PROMPT) boxRotY += dt * 0.45;
+
+      for (let i = 0; i < P_COUNT; i++) {
+        const ix = i * 3;
+        const iy = i * 3 + 1;
+        const iz = i * 3 + 2;
+
+        let px = posArray[ix], py = posArray[iy], pz = posArray[iz];
+        let vx = velArray[ix], vy = velArray[iy], vz = velArray[iz];
+        let targetColor = COL.silver;
+
+        if (
+          currentState === STATES.GALAXY_IDLE ||
+          currentState === STATES.WISH_WINDOW ||
+          currentState === STATES.WISH_RESPONSE ||
+          currentState === STATES.CATCH_WAIT ||
+          currentState === STATES.CATCH_WINDOW ||
+          currentState === STATES.METEOR_CAPTURED
+        ) {
+          const gp = galaxyPoints[i];
+          const angle = time * angleSpeed;
+          const rotX = gp.x * Math.cos(angle) - gp.z * Math.sin(angle);
+          const rotZ = gp.x * Math.sin(angle) + gp.z * Math.cos(angle);
+          let tx = rotX;
+          let ty = gp.y;
+          let tz = rotZ;
+
+          if (currentState === STATES.WISH_WINDOW && wishHoldTimer > 0) {
+            const pull = Math.min(wishHoldTimer / CONFIG.wishDuration, 1) * 0.6;
+            tx += (rightHand.pos.x - tx) * pull;
+            ty += (rightHand.pos.y - ty) * pull;
+            tz += (rightHand.pos.z - tz) * pull;
+          }
+
+          if (currentState === STATES.WISH_RESPONSE) {
+            const pull = Math.max(0, 1 - stateTime / 0.55);
+            tx *= (1 - 0.18 * pull);
+            ty *= (1 - 0.18 * pull);
+            tz *= (1 - 0.18 * pull);
+            if (stateTime > 0.38) {
+              const push = Math.min((stateTime - 0.38) / 0.55, 1) * 0.1;
+              tx *= (1 + push);
+              ty *= (1 + push);
+              tz *= (1 + push);
+            }
+          }
+
+          if (currentState === STATES.CATCH_WAIT || currentState === STATES.CATCH_WINDOW) {
+            if (i < 220 && interactiveMeteor) {
+              tx = interactiveMeteor.pos.x + (Math.random() - 0.5) * 0.9;
+              ty = interactiveMeteor.pos.y + (Math.random() - 0.5) * 0.9;
+              tz = interactiveMeteor.pos.z + (Math.random() - 0.5) * 0.3;
+              vx += (tx - px) * 0.16;
+              vy += (ty - py) * 0.16;
+              vz += (tz - pz) * 0.16;
+              vx *= 0.78;
+              vy *= 0.78;
+              vz *= 0.78;
+              targetColor = COL.brightSilver;
+            } else {
+              vx += (tx - px) * 0.015;
+              vy += (ty - py) * 0.015;
+              vz += (tz - pz) * 0.015;
+              vx *= 0.88;
+              vy *= 0.88;
+              vz *= 0.88;
+              targetColor = Math.hypot(px, pz) < 8 ? COL.white : COL.silver;
+            }
+          } else if (currentState === STATES.METEOR_CAPTURED && interactiveMeteor && i % 5 === 0) {
+            const d = Math.hypot(interactiveMeteor.pos.x - px, interactiveMeteor.pos.y - py, interactiveMeteor.pos.z - pz);
+            if (d < 6) {
+              vx += (interactiveMeteor.pos.x - px) * 0.05;
+              vy += (interactiveMeteor.pos.y - py) * 0.05;
+              vz += (interactiveMeteor.pos.z - pz) * 0.05;
+              targetColor = COL.brightSilver;
+            }
+            vx *= 0.88; vy *= 0.88; vz *= 0.88;
+          } else {
+            vx += (tx - px) * 0.015;
+            vy += (ty - py) * 0.015;
+            vz += (tz - pz) * 0.015;
+            vx *= 0.88;
+            vy *= 0.88;
+            vz *= 0.88;
+            targetColor = Math.hypot(px, pz) < 8 ? COL.white : COL.silver;
+          }
+        } else if (currentState === STATES.ENERGY_CORE) {
+          const compress = Math.min(stateTime / CONFIG.energyCoreDuration, 1);
+          const radius = 1.5 * (1 - compress * 0.6);
+          const dx = corePos.x + Math.sin(i * 0.13 + time * 4) * radius - px;
+          const dy = corePos.y + Math.cos(i * 0.09 + time * 3) * radius - py;
+          const dz = corePos.z + Math.sin(i * 0.11 + time * 5) * radius - pz;
+          vx += dx * (0.06 + compress * 0.04);
+          vy += dy * (0.06 + compress * 0.04);
+          vz += dz * (0.06 + compress * 0.04);
+          vx *= 0.82;
+          vy *= 0.82;
+          vz *= 0.82;
+          targetColor = (i % 3 === 0) ? COL.brightSilver : COL.softBlue;
+        } else if (currentState === STATES.BOX_FORM || currentState === STATES.BOX_HOLD || currentState === STATES.BLOOM_PROMPT) {
+          const gp = giftPoints[i];
+          const rx = gp.x * Math.cos(boxRotY) - gp.z * Math.sin(boxRotY);
+          const rz = gp.x * Math.sin(boxRotY) + gp.z * Math.cos(boxRotY);
+          const tx = rx + corePos.x;
+          const ty = gp.y + corePos.y;
+          const tz = rz + corePos.z;
+          const force = currentState === STATES.BOX_FORM ? 0.09 : 0.055;
+          vx += (tx - px) * force;
+          vy += (ty - py) * force;
+          vz += (tz - pz) * force;
+          vx *= 0.84;
+          vy *= 0.84;
+          vz *= 0.84;
+          targetColor = giftRibbonMask[i] ? COL.warmWhite : COL.deepSilver;
+        } else if (currentState === STATES.BOX_OPEN) {
+          const gp = giftPoints[i];
+          tempVec3.set(gp.x, gp.y + 1.2, gp.z).normalize();
+          const worldX = px - corePos.x;
+          const worldY = py - corePos.y;
+          const worldZ = pz - corePos.z;
+          const worldLen = Math.max(Math.hypot(worldX, worldY, worldZ), 0.001);
+          vx += (worldX / worldLen) * 0.085 + tempVec3.x * 0.02;
+          vy += (worldY / worldLen) * 0.085 + 0.03;
+          vz += (worldZ / worldLen) * 0.085 + tempVec3.z * 0.02;
+          vx *= 0.94;
+          vy *= 0.94;
+          vz *= 0.94;
+          targetColor = i % 2 === 0 ? COL.brightSilver : COL.softPink;
+        } else if (currentState === STATES.TEXT_REVEAL || currentState === STATES.ENDING) {
+          const tp = textPoints[i];
+          const textForce = currentState === STATES.TEXT_REVEAL
+            ? Math.max(0.03, Math.min((stateTime - 0.9) * 0.05, 0.1))
+            : 0.08;
+          vx += (tp.x - px) * textForce;
+          vy += (tp.y - py) * textForce;
+          vz += (tp.z - pz) * textForce;
+          vx *= 0.86;
+          vy *= 0.86;
+          vz *= 0.86;
+          targetColor = i % 2 === 0 ? COL.softPink : COL.white;
+        }
+
+        posArray[ix] += vx;
+        posArray[iy] += vy;
+        posArray[iz] += vz;
+        velArray[ix] = vx;
+        velArray[iy] = vy;
+        velArray[iz] = vz;
+
+        colorArray[ix] += (targetColor.r - colorArray[ix]) * 0.1;
+        colorArray[iy] += (targetColor.g - colorArray[iy]) * 0.1;
+        colorArray[iz] += (targetColor.b - colorArray[iz]) * 0.1;
+      }
+
+      particles.geometry.attributes.position.needsUpdate = true;
+      particles.geometry.attributes.color.needsUpdate = true;
+    }
+
+    function resetExperience() {
+      for (let i = meteors.length - 1; i >= 0; i--) {
+        scene.remove(meteors[i].mesh);
+        scene.remove(meteors[i].trailMesh);
+        meteors[i].mesh.geometry.dispose();
+        meteors[i].trailMesh.geometry.dispose();
+      }
+      meteors.length = 0;
+      interactiveMeteor = null;
+      ambientMeteorCooldown = 1.2;
+      firstWishMeteorShown = false;
+      bloomTriggered = false;
+      wishHoldTimer = 0;
+      closeHoldTimer = 0;
+      openHoldTimer = 0;
+      pointerState.clicked = false;
+      pointerState.dblTapped = false;
+      boxRotY = 0;
+      setMeteorFocus(false);
+
+      for (let i = 0; i < P_COUNT; i++) {
+        velArray[i * 3] = (Math.random() - 0.5) * 1.4;
+        velArray[i * 3 + 1] = (Math.random() - 0.5) * 1.4;
+        velArray[i * 3 + 2] = (Math.random() - 0.5) * 1.4;
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const time = clock.getElapsedTime();
+      stateTime += dt;
+
+      updateGestureState(dt);
+      updateMeteors(dt, time);
+      updateStateMachine(dt);
+      updateParticles(dt, time);
+      composer.render();
+    }
+  </script>
+</body>
+</html>
